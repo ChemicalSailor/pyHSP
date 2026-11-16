@@ -1,0 +1,24 @@
+{
+  "SolventA":{
+    "dD":14.5,
+    "dP":8.0,
+    "dH":13.5,
+    "MVol":57.6,
+    "CAS":"64-19-7",
+    "SMILES":"CC(O)=O",
+    "Score":1.0,
+    "dH_donor":11.5,
+    "dH_acceptor":7.1
+  },
+  "SolventB":{
+    "dD":16.0,
+    "dP":11.7,
+    "dH":10.2,
+    "MVol":95.0,
+    "CAS":"108-24-7",
+    "SMILES":"CC(OC(C)=O)=O",
+    "Score":1.0,
+    "dH_donor":0.0,
+    "dH_acceptor":10.2
+  }
+}

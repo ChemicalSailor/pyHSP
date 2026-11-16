@@ -1,0 +1,52 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<HSP_Data>
+  <Chemical>
+    <No.>1</No.>
+    <Solvent>SolventA</Solvent>
+    <δD>14.5</δD>
+    <δP>8</δP>
+    <δH>13.5</δH>
+    <δHD_x002F_A>11.5/7.1</δHD_x002F_A>
+    <Score>1</Score>
+    <RED>1.030*</RED>
+    <MVol>57.6</MVol>
+    <CAS>64-19-7</CAS>
+    <SMILES>CC(O)=O</SMILES>
+    <Results>-</Results>
+  </Chemical>
+  <Chemical>
+    <No.>2</No.>
+    <Solvent>SolventB</Solvent>
+    <δD>16</δD>
+    <δP>11.7</δP>
+    <δH>10.2</δH>
+    <δHD_x002F_A>0.0/10.2</δHD_x002F_A>
+    <Score>1</Score>
+    <RED>0.654</RED>
+    <MVol>95</MVol>
+    <CAS>108-24-7</CAS>
+    <SMILES>CC(OC(C)=O)=O</SMILES>
+    <Results>-</Results>
+  </Chemical>
+  <Chemical>
+    <No. />
+    <Solvent />
+    <δD />
+    <δP />
+    <δH />
+    <δHD_x002F_A />
+    <Score />
+    <RED />
+    <MVol />
+    <CAS />
+    <SMILES />
+    <Results>In= 62 Out= 26 Total= 88
+δD= 16.8 δP=9.3 δH=4.2
+δTot = 19.6 R= 10.1
+Fit= 0.838
+Core= ±[0.25, 0.20, 0.20]
+Wrong In= 4
+Wrong Out= 8
+</Results>
+  </Chemical>
+</HSP_Data>

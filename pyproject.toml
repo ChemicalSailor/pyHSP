@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyhsp"
+dynamic = ["version"]
+description = 'Hansen Solubility Parameter (HSP) fitting.'
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+keywords = ["Hansen Solubility", "Chemistry", "Science", "scikit-learn"]
+authors = [
+  { name = "Tom Fletcher" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "numpy>=2",
+  "pandas>=3",
+  "scikit-learn>=1.8",
+]
+
+# [project.urls]
+# Documentation = "https://github.com/Tom/pyhsp#readme"
+# Issues = "https://github.com/Tom/pyhsp/issues"
+# Source = "https://github.com/Tom/pyhsp"
+
+[tool.hatch.version]
+path = "src/pyhsp/__init__.py"
+
+[tool.hatch.envs.default]
+dependencies = [
+  "pytest",
+  "pytest-cov",
+  "pytest-check",
+  "jupyterlab",
+  "matplotlib",
+  "seaborn",
+  "hspipy",
+]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/pyhsp tests}"
+
+[tool.coverage.run]
+source_pkgs = ["pyhsp", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/pyhsp/__about__.py",
+]
+
+[tool.coverage.paths]
+pyhsp = ["src/pyhsp", "*/pyhsp/src/pyhsp"]
+tests = ["tests", "*/pyhsp/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
