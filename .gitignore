@@ -47,7 +47,6 @@ dmypy.json
 .DS_Store
 
 # Project-specific files
-examples/*
 internal/*
 literature/*
 *.xlsx

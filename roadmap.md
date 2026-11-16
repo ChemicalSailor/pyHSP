@@ -6,7 +6,7 @@
 - [x] Batch processing
 - [x] Tests
 - [] Static typing
-- [] Inline docs
+- [x] Inline docs
 - [] Comparison of fit results against HSPiP
 - [] Example notebook
 
