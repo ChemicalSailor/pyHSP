@@ -724,6 +724,40 @@ class _HSPDataFrameAccessor:
         X = self(HSP, return_scores=False, drop_na=False)
         return self._sphere.predict_proba(X)
 
+    def decision_function(self, HSP: pd.DataFrame) -> pd.Series:
+        """
+        Calculate the signed distance of solvents from the sphere boundary.
+
+        Parameters
+        ----------
+        HSP : pandas.DataFrame
+            Input solvent HSP data.
+
+        Returns
+        -------
+        pandas.Series
+            Signed distance metric, indexed like the input.
+        """
+        X = self(HSP, return_scores=False, drop_na=False)
+        return self._sphere.decision_function(X)
+
+    def distance(self, HSP: pd.DataFrame) -> pd.Series:
+        """
+        Calculate distances from the fitted sphere center to solvents.
+
+        Parameters
+        ----------
+        HSP : pandas.DataFrame
+            Input solvent HSP data.
+
+        Returns
+        -------
+        pandas.Series
+            Distances in Hansen solubility space, indexed like the input.
+        """
+        X = self(HSP, return_scores=False, drop_na=False)
+        return self._sphere.distance(X)
+
     def score(
         self, HSP: pd.DataFrame, *, scoring: str = "f1", score_col: str = "Score"
     ) -> pd.Series:
