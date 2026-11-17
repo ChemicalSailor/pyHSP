@@ -784,21 +784,10 @@ class _HSPDataFrameAccessor:
 
 class ClassicSphere(HSPEstimator):
     """
-    HSP estimator using the classic algorithm.
+    HSP estimator using the classic distance metric.
 
     Parameters
     ----------
-    graded : bool, default=False
-        Use graded scoring for sphere fit. Scores should be in the interval [0, 1].
-    da : bool, default=False
-        Use donor/acceptor HSP for sphere fit.
-    bounds : list of tuple of (float or None, float or None) or None, default=None
-        Coefficient bounds to use during fitting. If supplied, this should be a
-        list of (min, max) pairs of equal length to the number of coefficients,
-        i.e. 4 for a standard fit and 5 for a donor/acceptor split; `None` may
-        be specified to indicate no bound. See SciPy optimization documentation
-        for additional details. By default the solubility parameters are bounded
-        to be strictly positive and the radius is unbounded.
     alpha : float, default=0
         Regularization factor that controls the sphere radius. Negative values
         favor a smaller sphere; positive values favor a larger sphere.
@@ -806,32 +795,38 @@ class ClassicSphere(HSPEstimator):
         Factor controlling the sharpness of the sphere boundary. High values
         give a hard boundary where misclassification is strongly penalised,
         whereas a low value gives a soft boundary which may be more relevant for
-        samples with marginal solubility in several solvents. Passing a value of
-        'fit' will cause the value to be estimated during fitting; as this
+        samples with marginal solubility in several solvents. This parameter can be
+        estimated during fitting by passing a value of 'fit'; as this
         increases the number of model parameters, it is recommended to only use
-        this option with a large number of test cases.
+        this option with a large number of samples.
     initialisation : {"mean", "random"}, default="mean"
-        Method to generate initial points. Mean initialisation tends to
-        result in fits close to the global minimum. Random initialisation
-        tends to explore a wider solubility space but can settle into local
-        minima.
+        Method to generate initial points. Mean initialisation generates initial
+        conditions based on good solvents. Random initialisation generates initial
+        points by sampling uniformly across the Hansen space.
     init_sigma : float, default=3.0
         Sigma value to use in Gaussian sampling when ``initialisation="mean"``.
         Increasing will introduce more variability in initial HSP values,
         exploring a wider solubility space with the risk of settling into local
         minima.
     loss : callable or None, default=None
-        Custom loss function accepting ``y_true``, ``y_pred``, and
+        Custom loss function accepting ``y_true``, ``y_proba``, and
         ``sample_weight``. If not callable, the built-in log loss is used.
     squared_dist : bool, default=False
         Whether to use squared distances in fitting. The default uses
         unsquared distances.
     eps : float, default=1e-12
         Small value used to clip probabilities in the built-in log loss.
+    bounds : list of (min, max) tuples, default=None
+        Coefficient bounds to use during fitting. If supplied, this should be a
+        list of (min, max) pairs of equal length to the number of coefficients,
+        i.e. 4 for a standard fit and 5 for a donor/acceptor split; `None` may
+        be specified to indicate no bound. See SciPy optimization documentation
+        for additional details. By default the solubility parameters and radius
+        are bounded to be strictly positive.
     method : str, default="L-BFGS-B"
         Algorithm passed to SciPy's ``minimize`` function.
     n_fits : int, default=20
-        Number of optimization attempts to run.
+        Number of optimization attempts.
     random_state : int or None, default=None
         Seed used to initialize the random number generator for fit
         initializations.
@@ -839,51 +834,60 @@ class ClassicSphere(HSPEstimator):
     Attributes
     ----------
     coef_ : pandas.Series
-        Fit HSP coefficients, including sphere radius and value of beta used or
-        estimated during the fit.
+        Fit HSP coefficients, including sphere radius.
+    beta_ : float
+        Coefficient for sharpness of the sphere boundary used or estimated during fitting.
     fit_results_ : pandas.DataFrame
         HSP coefficients and value of loss function for each fit in `n_fits`.
     fit_success_ : int
         Number of successful optimization attempts.
+    pd : accessor
+        See support for pandas dataframes in the notes.
 
-    Methods
-    -------
-    set_coef
-    from_hsdx
-    to_dict
-    to_json
-    from_dict
-    from_json
-    fit
-    fit_predict
-    predict
-    predict_proba
-    score
-    decision_function
-    distance
-    RED
+    Examples
+    --------
+    Fit a sphere using example data
+
+    >>> from pyHSP.examples import load_pla
+    >>> pla = load_pla()
+    >>> X = pla[['dD', 'dP', 'dH']]
+    >>> y = pla['Score']
+    >>> sphere = ClassicSphere().fit(X, y)  # Series with same index as X
+
+    Make predictions
+
+    >>> predicted_solubility = sphere.predict(X)
+
+    Use the `pd` accessor
+
+    >>> sphere = ClassicSphere().pd.fit(pla)
+    >>> predicted_solubility = sphere.pd.predict(pla)
 
     Notes
     -----
-    API
+    **API**
         The estimator API follows scikit-learn conventions: solvent HSPs are
-        features ``X`` and solubility scores are targets ``y``. Array-like
-        inputs, including pandas objects, are accepted. Methods decorated for
-        pandas input preserve the input DataFrame index in their Series output;
-        array-like inputs produce NumPy arrays.
-    graded vs non-graded fit
-    donor-acceptor fitting
-    dataframe preparation
-    bounds, -ve radius & inc_self
+        features ``X`` and solubility scores are targets ``y``, respectively passed as 2d
+        and 1d array-like objects; return values are numpy arrays. `X` is assumed to have three
+        columns in the order dD, dP, dH; an error will be raised if an array with incorrect shape is
+        passed. An HSPEstimator is a scikit-learn classifier, implementing `fit`, `predict`, `predict_proba`,
+        `decision_function` and `score` methods. The default scorer used is the F1 metric.
+        Methods to calculate solute-solvent distance and RED are additionally provided.
 
+    **Support for pandas dataframes**
+        DataFrames and Series can be used as 2d and 1d array-like objects respectively, but
+        dataframes must still adhere to the three column convention. If a method receives dataframe
+        input the output will be a Series with the same index. Enhanced support for dataframes is
+        provided via the `pd` accessor: This implements the same methods which accept a (variable size) dataframe as a
+        single paramter; the appropriate columns are extracted for the `X` and `y` variables and passed
+        to the estimator.
     """
 
     def __init__(
         self,
         *,
-        graded: bool = False,
-        da: bool = False,
-        bounds: list[tuple[float | None, float | None]] | None = None,
+        # graded: bool = False,
+        # da: bool = False,
         alpha: float = 0,
         beta: float = BETA_MAX,
         initialisation: Literal["mean", "random"] = "mean",
@@ -891,44 +895,13 @@ class ClassicSphere(HSPEstimator):
         loss: Callable | None = None,
         squared_dist: bool = False,
         eps: float = 1e-12,
+        bounds: Sequence[tuple[float | None, float | None]] | None = None,
         method: str = "L-BFGS-B",
         n_fits: int = 20,
         random_state: int | None = None,
     ):
-        """
-        Initialize the classic Hansen sphere estimator.
-
-        Parameters
-        ----------
-        graded : bool, default=False
-            Whether target scores may take values throughout [0, 1].
-        da : bool, default=False
-            Whether to use separate donor and acceptor HSP features.
-        bounds : list of tuple of (float or None, float or None) or None, default=None
-            Bounds for the sphere coefficients.
-        alpha : float, default=0
-            Radius regularization factor.
-        beta : float or "fit", default=10.0
-            Boundary sharpness, or ``"fit"`` to estimate it.
-        initialisation : {"mean", "random"}, default="mean"
-            Strategy for generating initial coefficient values.
-        init_sigma : float, default=3.0
-            Standard deviation of noise added to mean-based initial values.
-        loss : callable or None, default=None
-            Custom loss function. Non-callable values use the built-in log loss.
-        squared_dist : bool, default=False
-            Whether to use squared distances for fitting.
-        eps : float, default=1e-12
-            Probability clipping value used by the built-in log loss.
-        method : str, default="L-BFGS-B"
-            Optimization method passed to SciPy's ``minimize``.
-        n_fits : int, default=20
-            Number of optimization attempts.
-        random_state : int or None, default=None
-            Seed for the random number generator.
-        """
-        self.graded = graded
-        self.da = da
+        self.graded = False
+        self.da = False
         self.bounds = bounds
         self.alpha = alpha
         self.beta = beta

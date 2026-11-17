@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from typing import Callable, List, Union, Literal
+from typing import Callable, List, Union, Literal, Sequence
 from numpy.typing import ArrayLike
 
 from .types import SeriesOrDataFrame
@@ -28,25 +28,24 @@ def validate_HSP_dataframe(
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df : pandas.DataFrame
         The dataframe to check.
-    da : bool, optional
-        Check for donor/accepter dH columns. The default is False.
-    check_mvol : bool, optional
-        Check for an MVol column. The default is False.
-    check_index : bool, optional
-        Check the index is a string dtype, e.g solvent names. The default is True.
+    da : bool, default=False
+        Check for donor/accepter dH columns.
+    check_mvol : bool, default=False
+        Check for an MVol column.
+    check_index : bool, default=True
+        Check the index is a string dtype, e.g solvent names.
 
     Returns
     -------
-    pd.DataFrame
+    pandas.DataFrame
         The unmodified dataframe.
 
     Raises
     ------
     TypeError
-        If column dtypes are not numeric.
-        If index does not have a string dtype
+        If column dtypes are not numeric and if the index does not have a string dtype and ``check_index`` is True.
 
     """
     required_cols = _get_labels(da)
@@ -69,33 +68,39 @@ def HSP(
     data: ArrayLike,
     da: bool = False,
     mvol: bool = False,
-    index: List[str] | None = None,
+    index: list[str] | None = None,
     validate: Literal[False, "no-index", "strict"] = "no-index",
 ) -> pd.DataFrame:
     """
-    Format an array as a dataframe with dD, dP, dH columns.
+    Format an array as a dataframe with columns labelled according to pyHSP convention.
 
     Parameters
     ----------
-    data : array-like
+    data : array-like of shape (n_features,) or (n_samples, n_features)
         Numeric Hansen solubility parameters. 1d data is converted to 2d to
-        match the dataframe format.
-    da : bool, optional
-        Treat `data` as having dH_donor and dH_accepter columns. The default
-        is False.
-    mvol : bool, optional
+        match the dataframe format. Features are assumed to be in the order dD, dP, dH.
+        If ``da=True`` then features are assumed to be dD, dP, dH_donor, dH_acceptor.
+    da : bool, default=False
+        Treat `data` as having dH_donor and dH_acceptor columns.
+    mvol : bool, default=False
         Treat `data` as having an 'MVol' column. This is expected as the last
-        column. The default is False.
-    index : List[str], optional
+        column.
+    index : list[str], default=None
         The index to use for the dataframe, typically a list of solvent names.
-    validate : False | 'no-index' | 'strict', optional
+    validate : {False, 'no-index', 'strict'}, default='no-index'
         Validate the dataframe structure after creation. 'strict' mode checks
         the dataframe index is a string dtype, 'no-index' disables the index
         dtype check, `False` disables all validation.
 
     Returns
     -------
-    DataFrame
+    pandas.DataFrame
+        The converted array.
+
+    Raises
+    ------
+    ValueError
+        When the input array does not have the same number of features defined by the ``da`` and ``mvol`` parameters.
 
     """
     data = np.atleast_2d(data)
@@ -119,7 +124,7 @@ def HSP(
 # TODO: add an example to docs
 def index_contains(
     series_or_dataframe: SeriesOrDataFrame,
-    entries: str | List[str],
+    entries: str | Sequence[str],
     case_sensitive: bool = False,
     return_mask: bool = False,
 ):
@@ -128,24 +133,23 @@ def index_contains(
 
     Parameters
     ----------
-    series_or_dataframe : Series | DataFrame
+    series_or_dataframe : pandas.Series or pandas.DataFrame
         The series or dataframe object to search. The search is for strings
         containing the given text.
-    entries : list-like
-        A list of strings to search for.
-    case_sensitive : bool, optional
-        Apply case-sensitive searching. The default is False.
-    return_mask : bool, optional
-        Return a boolean array indicating found entries. The default is False.
+    entries : str or sequence of str
+        The string or strings to search for.
+    case_sensitive : bool, default=False
+        Apply case-sensitive searching.
+    return_mask : bool, default=False
+        Return a boolean array indicating found entries.
 
     Returns
     -------
-    Series, DataFrame
-        A new series or dataframe with any found entries.
-    array
-        A boolean array indicating found entries, if `return_mask` is Truthy
+    pandas.Series or pandas.DataFrame or ndarray
+        A new series or dataframe with any found entries. If `return_mask` is truthy and ndarray is returned.
 
     """
+
     idx = series_or_dataframe.index
     if isinstance(entries, str):
         entries = [entries]
@@ -180,34 +184,30 @@ def prepare_dataframe(
 
     Parameters
     ----------
-    HSP_data : pd.DataFrame
+    HSP_data : pandas.DataFrame
         Solubility data.
-    scores : bool | str, optional
+    scores : bool or str, default=True
         Whether to return scores data. If True then scores are assumed to be
         in the column name 'score'. Alternatively the column name can be
         provided as a string; string matching is not case-sensitive.
-        The default is True.
-    drop_na : bool, optional
-        Whether to drop rows which do not have a score. The default is True.
-        This parameter is ignored when `scores=False`.
-    da : bool, optional
-        Use donor/acceptor terms in place of dH column. The default is False.
-    inc_mvol : bool, optional
-        Whether to include the molar volume (mvol) column. The default is False.
-    inc_conc : bool | str, optional
+    drop_na : bool, default=True
+        Whether to drop rows which do not have a score. This parameter is ignored when `scores=False`.
+    da : bool, default=False
+        Use split hydrogen bonding term. Expects and returns dH_donor and dH_acceptor columns.
+    inc_mvol : bool, default=False
+        Whether to include the molar volume (mvol) column.
+    inc_conc : bool or str, default=False
         Whether to include the concentration column. If `True` the column is assumed
         to be labelled 'conc'. Alternatively the column name can be provided as a
-        string; string matching is not case-sensitive. The default is False. Note
-        that the returned column in the return dataframe will always be labelled 'conc'.
-    convert_to_molar : bool, optional
-        Whether to convert the concentration (assumed to be given in mg/ml)
-        to a molar concentration. The default is False.
-    Mw : float, optional
+        string; string matching is not case-sensitive. The returned column in the return dataframe will always be labelled 'conc'.
+    convert_to_molar : bool, default=False
+        Convert the concentration (assumed to be given in mg/ml)
+        to a molar concentration.
+    Mw : float, default=None
         The solute molecular weight. Required when `convert_to_molar` is `True`.
-        The default is None.
-    scores_transformer : callable, optional
+    scores_transformer : callable, default=None
         Function to apply to scores. The function recieves and is expected to
-        return a 1D array-like object. The default is None.
+        return a 1D array-like object.
 
     Raises
     ------
@@ -216,7 +216,7 @@ def prepare_dataframe(
 
     Returns
     -------
-    X: pd.DataFrame, y: pd.Series (optional)
+    X: pandas.DataFrame, y: pandas.Series (optional)
 
     """
     df = HSP_data.copy()
