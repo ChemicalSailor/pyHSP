@@ -73,7 +73,7 @@ from .functional import (
 from .io import read_hsdx_result
 from ._utils import check_X, check_X_y, _as_series, check_beta
 from ._conf import BETA_MAX
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 # # TODO: docstring
 # def fit_sphere(HSP, graded=False, classic=False, Mw=None, score_col="score"):
@@ -97,8 +97,8 @@ from numpy.typing import ArrayLike
 
 # TODO: add dHA and dHD scaling as proposed by Louwerse
 def _decision_function(
-    coefs: np.ndarray,
-    X: np.ndarray,
+    coefs: ArrayLike,
+    X: ArrayLike,
     *,
     da: bool = False,
     # conc: bool = False,
@@ -107,7 +107,7 @@ def _decision_function(
     dD_correction: bool = True,
     squared_dist: bool = False,
     # eps: float = 1e-12,
-) -> np.ndarray:
+) -> NDArray[np.floating]:
     """
     Calculate the signed distance from the solubility-sphere boundary.
 
@@ -138,14 +138,14 @@ def _decision_function(
     ndarray of shape (n_samples,)
         Signed distance from the sphere boundary.
     """
-    X, coefs = np.asarray(X), np.asarray(coefs)
+    X, coefs = np.asarray(X, dtype=np.float64), np.asarray(coefs, dtype=np.float64)
 
     assert X.ndim == 2
     assert coefs.ndim == 1
 
-    solv_HSP = X[:, :4] if da else X[:, :3]
-    solute_HSP = coefs[:4] if da else coefs[:3]
-    solute_radius = coefs[4] if da else coefs[3]
+    solv_HSP: NDArray[np.floating] = X[:, :4] if da else X[:, :3]
+    solute_HSP: NDArray[np.floating] = coefs[:4] if da else coefs[:3]
+    solute_radius: float = coefs[4] if da else coefs[3]
 
     benchmark_conc = 0.5
 
@@ -195,7 +195,12 @@ def _decision_function(
     return in_out_score
 
 
-def _log_loss(y_true, y_proba, sample_weight=None, eps=1e-12):
+def _log_loss(
+    y_true: np.ndarray,
+    y_proba: np.ndarray,
+    sample_weight: np.ndarray | None = None,
+    eps: float = 1e-12,
+):
     """
     Calculate binary log loss, including for graded target values.
 
@@ -238,6 +243,8 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
     """Base class for solubility sphere fitting."""
 
     da: bool
+    graded: bool
+    squared_dist: bool
     coef_: pd.Series
     _dfunc_kwargs: dict
     pd: _HSPDataFrameAccessor
@@ -540,48 +547,43 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
         self.fit(X, y)
         return self.predict(X)
 
+    def score(
+        self,
+        X: ArrayLike,
+        y_true: ArrayLike,
+        *,
+        sample_weight: ArrayLike | None = None,
+        scoring: Callable | str = "f1",
+    ):
+        """
+        Evaluate the fitted sphere with a scikit-learn scorer.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+            Solvent HSPs with three features ('dD', 'dP', 'dH') or four ('dD', 'dP', 'dH_donor', 'dH_acceptor') when donor and acceptor
+            HSPs are separate.
+        y_true : array-like of shape (n_samples,)
+            True solubility scores for ``X``.
+        sample_weight : array-like of shape (n_samples,) or None, default=None
+            Per-sample weights passed to the scorer.
+        scoring : str or callable, default="f1"
+            Scikit-learn scorer name or scorer callable.
+
+        Returns
+        -------
+        float
+            The selected score. The default F1 score is useful for
+            classification with imbalanced classes.
+        """
+        X, y = check_X_y(
+            X, y_true, n_features=self._n_hsp, graded=self.graded, estimator=self
+        )
+        scorer = get_scorer(scoring)
+        return scorer(self, X, y_true, sample_weight=sample_weight)
+
     # if plotly_installed:
     #     plot = CachedAccessor("plot", PlotlyAccessor)
-
-
-# class ClassifierSphereMixin( ClassifierMixin ):
-#     """Mixin for Spheres that behave as classifiers."""
-#     pass
-
-
-# class RegressorSphereMixin( RegressorMixin ):
-#     pass
-
-
-# DataPrepSelfType = TypeVar( "self", bound="DataPrepMixin" )
-# class DataPrepMixin( ABC ):
-#     # Methods for preparing HSP DataFrames
-
-#     @abstractmethod
-#     def prepare( self, data:pd.DataFrame, scores:bool=True ):
-#         pass
-
-#     def prepare_fit( self, data:pd.DataFrame, **prepare_kw ) -> DataPrepSelfType:
-#         prepare_kw.setdefault( 'scores', True )
-#         X, y = self.prepare( data, **prepare_kw )
-#         self.fit( X, y )
-#         return self
-
-#     def prepare_predict( self, data:pd.DataFrame, **prepare_kw ):
-#         X = self.prepare( data, scores=False, **prepare_kw )
-#         return self.predict( X )
-
-#     def prepare_fit_predict( self, data:pd.DataFrame, **prepare_kw ):
-#         prepare_kw.setdefault( 'scores', True )
-#         X, y = self.prepare( data, **prepare_kw )
-#         self.fit( X, y )
-#         pred = self.predict( X )
-#         return pred
-
-#     def prepare_score( self, data:pd.DataFrame, **prepare_kw ):
-#         prepare_kw.setdefault( 'scores', True )
-#         X, y = self.prepare( data, **prepare_kw )
-#         return self.score( X, y )
 
 
 class _HSPDataFrameAccessor:
@@ -590,7 +592,7 @@ class _HSPDataFrameAccessor:
         self,
         sphere: HSPEstimator,
         *,
-        inc_mvol: bool = False,
+        inc_mvol: bool | str = False,
         inc_conc: bool | str = False,
     ):
         """
@@ -600,12 +602,14 @@ class _HSPDataFrameAccessor:
         ----------
         sphere : HSPEstimator
             Estimator used to for sphere fitting.
-        inc_mvol : bool, default=False
+        inc_mvol : bool or str, default=False
             Whether to include the molar volume feature when preparing data.
+            A string specifies the concentration column name.
         inc_conc : bool or str, default=False
             Whether to include the concentration feature. A string specifies
             the concentration column name.
         """
+
         self._sphere = sphere
         self._inc_mvol = inc_mvol
         self._inc_conc = inc_conc
@@ -639,16 +643,16 @@ class _HSPDataFrameAccessor:
         """
         scores = score_col if return_scores else False
         scores_trf = None if self._sphere.graded else np.round
-        Mw = self._sphere.Mw if self._inc_conc else None
+        # Mw = self._sphere.Mw if self._inc_conc else None
         return prepare_dataframe(
             HSP,
             scores=scores,
             da=self._sphere.da,
             drop_na=drop_na,
-            inc_mvol=self._inc_mvol,
-            inc_conc=self._inc_conc,
-            convert_to_molar=True,
-            Mw=Mw,
+            mvol=self._inc_mvol,
+            conc=self._inc_conc,
+            # convert_to_molar=True,
+            # Mw=Mw,
             scores_transformer=scores_trf,
         )
 
@@ -887,21 +891,21 @@ class ClassicSphere(HSPEstimator):
         self,
         *,
         # graded: bool = False,
-        # da: bool = False,
+        da: bool = False,
         alpha: float = 0,
-        beta: float = BETA_MAX,
+        beta: float | Literal["fit"] = BETA_MAX,
         initialisation: Literal["mean", "random"] = "mean",
         init_sigma: float = 3.0,
         loss: Callable | None = None,
         squared_dist: bool = False,
         eps: float = 1e-12,
-        bounds: Sequence[tuple[float | None, float | None]] | None = None,
+        bounds: list[tuple[float | None, float | None]] | None = None,
         method: str = "L-BFGS-B",
         n_fits: int = 20,
         random_state: int | None = None,
     ):
         self.graded = False
-        self.da = False
+        self.da = da
         self.bounds = bounds
         self.alpha = alpha
         self.beta = beta
@@ -916,13 +920,8 @@ class ClassicSphere(HSPEstimator):
 
         self.pd = _HSPDataFrameAccessor(self, inc_mvol=False, inc_conc=False)
 
-    # def _check_X_y(self, X, y, min_samples=1):
-    #     return check_X_y(
-    #         X, y, min_samples=min_samples, n_features=self._n_hsp, graded=self.graded, estimator=self
-    #     )
-
     @classmethod
-    def from_hsdx(cls, path: TPathLike, *, beta_=BETA_MAX) -> Self:
+    def from_hsdx(cls, path: TPathLike, *, beta_: float = BETA_MAX) -> Self:
         """
         Create an estimator from fitted results in an HSDX file.
 
@@ -946,7 +945,9 @@ class ClassicSphere(HSPEstimator):
             da = False
         return cls(da=da, squared_dist=False).set_coef(coef, beta_=beta_)
 
-    def _get_initial_coefs(self, X, y, rng):
+    def _get_initial_coefs(
+        self, X: np.ndarray, y: np.ndarray, rng: np.random.RandomState
+    ):
         """
         Generate an initial coefficient vector for an optimization attempt.
 
@@ -1003,7 +1004,12 @@ class ClassicSphere(HSPEstimator):
             squared_dist=self.squared_dist,
         )
 
-    def _loss_fn(self, y_true, y_pred, sample_weight=None):
+    def _loss_fn(
+        self,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        sample_weight: np.ndarray | None = None,
+    ):
         """
         Evaluate the configured fitting loss.
 
@@ -1035,7 +1041,9 @@ class ClassicSphere(HSPEstimator):
 
         return fn(y_true, y_pred, sample_weight=sample_weight)
 
-    def fit(self, X, y, *, sample_weight=None):
+    def fit(
+        self, X: ArrayLike, y: ArrayLike, *, sample_weight: ArrayLike | None = None
+    ):
         """
         Fit the sphere to solvent HSPs and solubility scores.
 
@@ -1074,6 +1082,10 @@ class ClassicSphere(HSPEstimator):
             estimator=self,
         )
 
+        if sample_weight is not None:
+            sample_weight = np.asarray(sample_weight)
+            check_consistent_length(sample_weight, y)
+
         if np.var(y) == 0:
             raise ValueError(
                 "Cannot fit a sphere to data with no variation in the target values."
@@ -1082,14 +1094,19 @@ class ClassicSphere(HSPEstimator):
         n_coef = self._n_hsp + 1
 
         # validate and set up parameter beta
-        beta_is_str = isinstance(self.beta, str)
-        if (beta_is_str and not self.beta == "fit") or (
-            not beta_is_str and self.beta <= 0
-        ):
-            raise ValueError(
-                f"Invalid value {self.beta} for `beta`. Must be 'fit' or a positive number"
-            )
         fit_beta = self.beta == "fit"
+
+        e = ValueError(
+            f"Invalid value {self.beta} for `beta`. Must be 'fit' or a positive number"
+        )
+        if fit_beta:
+            beta = 0.0  # placeholder, beta will be fitted
+        else:
+            if isinstance(self.beta, str):
+                raise e
+            beta = float(self.beta)
+            if beta <= 0:
+                raise e
 
         # function to be minimised
         # we add -alpha * radius as a regularisation term to control sphere size
@@ -1097,10 +1114,10 @@ class ClassicSphere(HSPEstimator):
         def loss(coefs: np.ndarray, X: np.ndarray, y: np.ndarray) -> float:
             """Return the weighted data loss with radius regularization."""
             if fit_beta:
-                beta = coefs[-1]
+                beta: float = coefs[-1]
                 coefs = coefs[:-1]
             else:
-                beta = self.beta
+                beta = float(self.beta)
             radius = coefs[-1]
             in_out_dist = _decision_function(coefs, X, **self._dfunc_kwargs)
             proba = expit(beta * in_out_dist)
@@ -1142,7 +1159,7 @@ class ClassicSphere(HSPEstimator):
         # seed a random state that can propagate across multiple fits
         rng = check_random_state(self.random_state)
 
-        def single_fit(X, y):
+        def single_fit(X: np.ndarray, y: np.ndarray):
             """Run one bounded optimization attempt and return its result."""
             initial_coefs = self._get_initial_coefs(X, y, rng)
             # minimise loss() by adjusting coefs
@@ -1168,44 +1185,16 @@ class ClassicSphere(HSPEstimator):
         self.fit_results_ = fit_results
 
         labels = _get_labels(self.da) + ["radius"]
-        coef_ = fit_results[labels].iloc[0]
+        coef_: pd.Series = fit_results[labels].iloc[0]
         if fit_beta:
-            beta_ = fit_results["beta"].iloc[0]
+            beta_: float = fit_results["beta"].iloc[0]
         else:
-            beta_ = self.beta
+            beta_: float = beta
 
         # use set_coef to additionally set fit_params_
         self.set_coef(coef_, beta_=beta_)
 
         return self
-
-    def score(self, X, y_true, *, sample_weight=None, scoring="f1"):
-        """
-        Evaluate the fitted sphere with a scikit-learn scorer.
-
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, n_features)
-            Solvent HSPs with three features ('dD', 'dP', 'dH') or four ('dD', 'dP', 'dH_donor', 'dH_acceptor') when donor and acceptor
-            HSPs are separate.
-        y_true : array-like of shape (n_samples,)
-            True solubility scores for ``X``.
-        sample_weight : array-like of shape (n_samples,) or None, default=None
-            Per-sample weights passed to the scorer.
-        scoring : str or callable, default="f1"
-            Scikit-learn scorer name or scorer callable.
-
-        Returns
-        -------
-        float
-            The selected score. The default F1 score is useful for
-            classification with imbalanced classes.
-        """
-        X, y = check_X_y(
-            X, y_true, n_features=self._n_hsp, graded=self.graded, estimator=self
-        )
-        scorer = get_scorer(scoring)
-        return scorer(self, X, y_true, sample_weight=sample_weight)
 
     @_as_series
     def RED(self, X: ArrayLike):
@@ -1231,69 +1220,6 @@ class ClassicSphere(HSPEstimator):
         check_is_fitted(self, "coef_")
         X = check_X(X, n_features=self._n_hsp, estimator=self)
         return RED(self.coef_, X)
-
-
-# class Sphere(ClassicSphere):
-
-#     def __init__(
-#         self,
-#         Mw=None,
-#         *,
-#         da=False,
-#         graded=False,
-#         solvent_radii=False,
-#         bounds=None,
-#         alpha=0,
-#         benchmark_conc=0.5,
-#         mvol_factor=1520,
-#         initialisation="mean",
-#         init_sigma=1.0,
-#         loss="log",
-#         squared_dist=False,
-#         method="L-BFGS-B",
-#         n_fits=50,
-#         reduce="minimum",
-#         eps=1e-12,
-#     ):
-#         self.Mw = Mw
-#         self.graded = graded
-#         self.solvent_radii = solvent_radii
-#         self.benchmark_conc = benchmark_conc
-#         self.da = da
-#         self.alpha = alpha
-#         self.mvol_factor = mvol_factor
-#         self.method = method
-#         self.n_fits = n_fits
-#         self.initialisation = initialisation
-#         self.reduce = reduce
-#         self.eps = eps
-#         self.init_sigma = init_sigma
-#         self.loss = loss
-#         self.squared_dist = squared_dist
-#         self.bounds = bounds
-
-#         self.prepare = _HSPDataFrameAccessor(self, inc_mvol=True, inc_conc=True)
-
-#     @property
-#     def _dfunc_kwargs(self):
-#         return {
-#             "da": self.da,
-#             "conc": True,
-#             "benchmark_conc": self.benchmark_conc,
-#             "solvent_radii": self.solvent_radii,
-#             "mvol_factor": self.mvol_factor,
-#             "dD_correction": True,
-#             "squared_dist": self.squared_dist,
-#             "eps": self.eps,
-#         }
-
-#     def _check_X_y(self, X, y):
-#         return _check_X_y(X, y, min_features=self._n_hsp + 2, graded=self.graded)
-
-#     # TODO: docstring
-#     def radius(self, conc: float) -> float:
-#         check_is_fitted(self)
-#         return conc_correction(conc, self.benchmark_conc) * self.coef_[-1]
 
 
 class BatchedEstimator:
@@ -1325,7 +1251,7 @@ class BatchedEstimator:
         """
         self.estimator = estimator
 
-    def fit(self, X, y):
+    def fit(self, X: Sequence[ArrayLike], y: Sequence[ArrayLike]):
         """
         Fit a separate estimator to each dataset.
 
@@ -1344,12 +1270,12 @@ class BatchedEstimator:
         """
         self.fitted_estimators_ = []
         for single_X, single_y in zip(X, y):
-            new_estimator = clone(self.estimator)
+            new_estimator: HSPEstimator = clone(self.estimator)  # type: ignore
             new_estimator.fit(single_X, single_y)
             self.fitted_estimators_.append(new_estimator)
         return self
 
-    def predict(self, X):
+    def predict(self, X: Sequence[ArrayLike]):
         """
         Predict for each dataset using its corresponding fitted estimator.
 
@@ -1378,7 +1304,7 @@ class BatchedEstimator:
             predictions_list.append(estimator.predict(single_X))
         return predictions_list
 
-    def fit_predict(self, X, y):
+    def fit_predict(self, X: Sequence[ArrayLike], y: Sequence[ArrayLike]):
         """
         Fit one estimator per dataset and return predictions for those datasets.
 
@@ -1397,7 +1323,13 @@ class BatchedEstimator:
         self.fit(X, y)
         return self.predict(X)
 
-    def score(self, X, y_true, *, scorer=None):
+    def score(
+        self,
+        X: Sequence[ArrayLike],
+        y_true: Sequence[ArrayLike],
+        *,
+        scorer: str | None = None,
+    ):
         """
         Score each dataset with its corresponding fitted estimator.
 

@@ -78,14 +78,14 @@ def test_read_hsdx_result(filename, expected, data_dir, extended):
     if extended:
         expected["In"] = 62
         expected["Out"] = 26
-        expected["Fit"] = 0.838
         expected["Wrong In"] = 4
         expected["Wrong Out"] = 8
+        expected["Fit"] = 0.838
     pdt.assert_series_equal(result, expected)
 
 
 def test_read_hsdx_no_result(data_dir):
-    with pytest.raises(ValueError, match="fit result"):
+    with pytest.raises(ValueError, match="Error matching pattern"):
         read_hsdx_result(data_dir / "no_result.hsdx")
 
 

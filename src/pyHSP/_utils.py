@@ -13,7 +13,7 @@ import pandas as pd
 # import argparse
 
 from typing import Tuple, Callable
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from sklearn.utils import check_array as _skl_check_array, check_consistent_length
 from functools import wraps
 
@@ -22,9 +22,9 @@ from ._conf import BETA_MAX
 
 def check_X(
     X: ArrayLike, *, n_features: int = 3, min_samples: int = 1, estimator=None
-) -> np.ndarray:
+) -> NDArray[np.floating]:
     """Check that X is a valid array with the specified minimum features and samples."""
-    X_: np.ndarray = _skl_check_array(
+    X_ = _skl_check_array(
         X,
         ensure_2d=True,
         allow_nd=False,
@@ -42,9 +42,9 @@ def check_X(
 
 def check_y(
     y: ArrayLike, *, graded: bool = False, min_samples: int = 1, estimator=None
-) -> np.ndarray:
+) -> NDArray[np.floating]:
     """Check scores are either 0 or 1, or between 0 and 1 (inclusive) for graded scoring."""
-    y_: np.ndarray = _skl_check_array(
+    y_ = _skl_check_array(
         y,
         ensure_2d=False,
         allow_nd=False,
@@ -66,10 +66,6 @@ def check_y(
             "Invalid score values. All scores must be between 0 and 1 inclusive."
         )
     return y_
-    # if np.std(y_) == 0:
-    #     raise ValueError(
-    #         "Scores appear to be the same for all samples, which is impossible to fit."
-    #     )
 
 
 def check_X_y(
@@ -80,7 +76,7 @@ def check_X_y(
     min_samples: int = 1,
     graded: bool = False,
     estimator=None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
 
     X_ = check_X(X, n_features=n_features, min_samples=min_samples, estimator=estimator)
     y_ = check_y(y, graded=graded, min_samples=min_samples, estimator=estimator)
@@ -89,7 +85,7 @@ def check_X_y(
     return X_, y_
 
 
-def check_beta(beta: float) -> float:
+def check_beta(beta: int | float) -> float:
     """Check that beta is a valid float."""
     if not isinstance(beta, (int, float)):
         raise TypeError("beta must be a float.")
@@ -112,7 +108,7 @@ def check_beta(beta: float) -> float:
 # return wrapper
 
 
-def _as_series(func) -> Callable:
+def _as_series(func: Callable) -> Callable:
     """Decorator to output a series if input is a dataframe."""
 
     @wraps(func)

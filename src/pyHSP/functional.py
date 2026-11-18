@@ -8,10 +8,12 @@ import numpy as np
 # import argparse
 
 from typing import Literal
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
+
+from .types import Numeric
 
 
-def inverse_sum(a: float, b: float) -> float:
+def inverse_sum(a: Numeric, b: Numeric) -> Numeric:
     r"""
     Returns the inverse summation, or harmonic mean, of a and b.
 
@@ -23,7 +25,7 @@ def inverse_sum(a: float, b: float) -> float:
     return r_eff
 
 
-def conc_mol_to_wt(conc_mol: float, Mw: float) -> float:
+def conc_mol_to_wt(conc_mol: Numeric, Mw: Numeric) -> Numeric:
     """
     Convert mol/L to mg/mL.
 
@@ -43,7 +45,7 @@ def conc_mol_to_wt(conc_mol: float, Mw: float) -> float:
     return conc_mol * Mw
 
 
-def conc_wt_to_mol(conc_wt: float, Mw: float) -> float:
+def conc_wt_to_mol(conc_wt: Numeric, Mw: Numeric) -> Numeric:
     """
     Convert mg/mL to molar (mol/L) concentration.
 
@@ -63,7 +65,7 @@ def conc_wt_to_mol(conc_wt: float, Mw: float) -> float:
     return conc_wt / Mw
 
 
-def conc_correction(x: float, benchmark: float = 0.5) -> float:
+def conc_correction(x: Numeric, benchmark: float = 0.5) -> Numeric:
     r"""
     Calculate the radius concentration scaling factor.
 
@@ -92,7 +94,7 @@ def conc_correction(x: float, benchmark: float = 0.5) -> float:
     return num / den
 
 
-def molar_volume(Mw: float, density: float):
+def molar_volume(Mw: Numeric, density: Numeric) -> Numeric:
     """
     The volume occupied by one mole (MVol).
 
@@ -112,7 +114,7 @@ def molar_volume(Mw: float, density: float):
     return Mw / density
 
 
-def solvent_molarity(molar_volume: float):
+def solvent_molarity(molar_volume: Numeric) -> Numeric:
     """
     Calculate molarity (moles per litre) of a solvent.
 
@@ -130,7 +132,7 @@ def solvent_molarity(molar_volume: float):
     return 1000 / molar_volume
 
 
-def mole_fraction(molar_conc: float, solvent_molarity: float) -> float:
+def mole_fraction(molar_conc: Numeric, solvent_molarity: Numeric) -> Numeric:
     """
     Calculate solute concentration as mole ratio of solute to solvent.
 
@@ -149,7 +151,9 @@ def mole_fraction(molar_conc: float, solvent_molarity: float) -> float:
     return molar_conc / total_moles
 
 
-def _da_dist_euclid(da_a: np.ndarray, da_b: np.ndarray) -> np.ndarray:
+def _da_dist_euclid(
+    da_a: NDArray[np.floating], da_b: NDArray[np.floating]
+) -> NDArray[np.floating]:
     """Return the squared euclidean distance of donor/acceptor interaction."""
     assert da_a.ndim == 2
     assert da_b.ndim == 2
@@ -157,7 +161,9 @@ def _da_dist_euclid(da_a: np.ndarray, da_b: np.ndarray) -> np.ndarray:
     return (diff**2).sum(axis=1)
 
 
-def _da_dist_beerbower(da_a: np.ndarray, da_b: np.ndarray) -> np.ndarray:
+def _da_dist_beerbower(
+    da_a: NDArray[np.floating], da_b: NDArray[np.floating]
+) -> NDArray[np.floating]:
     """
     Return beerbower distance for donor/acceptor interaction
 
@@ -169,7 +175,9 @@ def _da_dist_beerbower(da_a: np.ndarray, da_b: np.ndarray) -> np.ndarray:
     return 2 * diff[:, 0] * diff[:, 1]
 
 
-def _da_dist_louwerse(da_a: np.ndarray, da_b: np.ndarray) -> np.ndarray:
+def _da_dist_louwerse(
+    da_a: NDArray[np.floating], da_b: NDArray[np.floating]
+) -> NDArray[np.floating]:
     """
     Return distance for donor/acceptor interaction as proposed by Louwerse et al.
 
@@ -194,7 +202,7 @@ def calculate_distance(
     root: bool = True,
     classic: bool = True,
     da: Literal[True, False, "euclid", "beerbower", "louwerse"] = False,
-) -> np.ndarray:
+) -> NDArray[np.floating]:
     r"""
     Calculate distance between points in Hansen solubility space.
 
@@ -251,7 +259,7 @@ def calculate_distance(
         \delta HD_1 \delta HA_1 - \delta HD_2 \delta HA_2)`. This form can result
         in a negative distance. Louwerse et al propose an alternative method for
         splitting dH into donor/acceptor parameters, therefore using another
-        form of parameter splitting with this mehtod is unlikely to yield
+        form of parameter splitting with this method is unlikely to yield
         useable results.
 
     """
@@ -288,13 +296,13 @@ def calculate_distance(
         # root=True and da=True handled above
         dist = np.sqrt(dist)
 
-    dist = dist.squeeze()
+    # dist = dist.squeeze()
     # if dist.size == 1:
     #     return dist.item()
     return dist
 
 
-def RED(solute_HSP: ArrayLike, solvent_HSP: ArrayLike):
+def RED(solute_HSP: ArrayLike, solvent_HSP: ArrayLike) -> Numeric:
     """
     Calculate the Relative Energy Difference.
 

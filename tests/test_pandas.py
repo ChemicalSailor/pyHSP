@@ -33,7 +33,7 @@ class TestValidateDataFrame:
     def test_not_a_dataframe():
         obj = np.empty((5, 3))
         with pytest.raises(TypeError, match="pandas DataFrame"):
-            validate_HSP_dataframe(obj)
+            validate_HSP_dataframe(obj)  # type: ignore
 
     @staticmethod
     def test_returns_valid(df):
@@ -167,12 +167,12 @@ class TestPrepareDataframe:
         ("param", "expected_cols"),
         [
             (dict(), cols),
-            (dict(inc_mvol=True), cols | {"mvol"}),
-            (dict(inc_conc=True), cols | {"conc"}),
+            (dict(mvol=True), cols | {"MVol"}),
+            (dict(conc=True), cols | {"Conc"}),
             (dict(da=True), {"dD", "dP", "dH_donor", "dH_acceptor"}),
         ],
     )
-    def test_expected_shape(self, param, expected_cols):
+    def test_expected_cols(self, param, expected_cols):
         X = prepare_dataframe(self.df, scores=False, **param)
         assert set(X.columns) == expected_cols
 
@@ -183,17 +183,18 @@ class TestPrepareDataframe:
         assert len(X) == expected_len
         assert len(y) == expected_len
 
-    def test_score_param(self):
-        X, y = prepare_dataframe(self.df, scores=True, drop_na=True)
-        assert all(y == [0.8, 0.3])
-        X, y = prepare_dataframe(self.df, scores="conc")
-        assert all(y == [10.0, 15.0, 10.0])
+    @pytest.mark.parametrize("scores", (True, "conc"))
+    def test_score_param(self, scores):
+        if scores == "conc":
+            X, y = prepare_dataframe(self.df, scores="conc")
+            assert all(y == [10.0, 15.0, 10.0])
+        else:
+            X, y = prepare_dataframe(self.df, scores=True, drop_na=True)
+            assert all(y == [0.8, 0.3])
 
     def test_no_Mw_error(self):
         with pytest.raises(ValueError, match="Cannot convert"):
-            prepare_dataframe(
-                self.df, convert_to_molar=True, Mw=None, inc_conc=True
-            )
+            prepare_dataframe(self.df, convert_to_molar=True, Mw=None, conc=True)
 
     def test_score_transform(self):
         X, y = prepare_dataframe(

@@ -5,10 +5,11 @@
 - [x] Fitting of classic HSP sphere using logistic function
 - [x] Batch processing
 - [x] Tests
-- [] Static typing
+- [x] Static typing
 - [x] Inline docs
 - [] Comparison of fit results against HSPiP
-- [] Example notebook
+- [x] Example notebook
+- [] Readme
 
 ## 0.2
 - [] Inclusion of donor/acceptor parameters a la HSPiP, i.e. using euclidean metric

@@ -289,7 +289,7 @@ class TestClassicSphere:
         X = np.array([[10.0] * 3, [20.0] * 3])
         y = np.array([1, 1])
         rng = check_random_state(None)
-        sphere = ClassicSphere(initialisation="silly")
+        sphere = ClassicSphere(initialisation="silly")  # type: ignore
         with pytest.raises(ValueError, match="'mean' or 'random'"):
             sphere._get_initial_coefs(X, y, rng)
 

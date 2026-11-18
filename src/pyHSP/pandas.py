@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from typing import Callable, List, Union, Literal, Sequence
+from typing import Callable, List, Union, Literal, Sequence, overload
 from numpy.typing import ArrayLike
 
 from .types import SeriesOrDataFrame
@@ -10,8 +10,8 @@ from .functional import conc_wt_to_mol
 from ._conf import HSP_COLS, HSP_DA_COLS
 
 
-def _get_labels(da=False, radius=False) -> List[str]:
-    labels = list(HSP_DA_COLS) if da else list(HSP_COLS)
+def _get_labels(da=False, radius=False) -> list[str]:
+    labels: list = list(HSP_DA_COLS) if da else list(HSP_COLS)
     if radius:
         labels += ["radius"]
     return labels
@@ -163,14 +163,44 @@ def index_contains(
     return series_or_dataframe.iloc[ma].copy()
 
 
+@overload
+def prepare_dataframe(
+    HSP_data: pd.DataFrame,
+    *,
+    scores: Literal[False] = False,
+    drop_na: bool = True,
+    da: bool = False,
+    mvol: bool | str = False,
+    conc: bool | str = False,
+    convert_to_molar: bool = False,
+    Mw: float | None = None,
+    scores_transformer: Callable | None = None,
+) -> pd.DataFrame: ...
+
+
+@overload
+def prepare_dataframe(
+    HSP_data: pd.DataFrame,
+    *,
+    scores: Literal[True] | str = ...,
+    drop_na: bool = True,
+    da: bool = False,
+    mvol: bool | str = False,
+    conc: bool | str = False,
+    convert_to_molar: bool = False,
+    Mw: float | None = None,
+    scores_transformer: Callable | None = None,
+) -> tuple[pd.DataFrame, pd.Series]: ...
+
+
 def prepare_dataframe(
     HSP_data: pd.DataFrame,
     *,
     scores: bool | str = True,
     drop_na: bool = True,
     da: bool = False,
-    inc_mvol: bool = False,
-    inc_conc: bool | str = False,
+    mvol: bool | str = False,
+    conc: bool | str = False,
     convert_to_molar: bool = False,
     Mw: float | None = None,
     scores_transformer: Callable | None = None,
@@ -178,31 +208,29 @@ def prepare_dataframe(
     """
     Prepare solubility data in a dataframe for fitting.
 
-    Returns an estimator compatible dataframe and (optionally) solubility scores as a series.
-    Columns are matched case-insensitively in the provided dataframe and only the required
-    columns are returned.
+    Returns an estimator compatible dataframe, and (optionally) solubility scores as a series.
+    Columns are matched case-insensitively in the provided dataframe. Only the required
+    columns are returned and are relabelled to pyHSP convention.
 
     Parameters
     ----------
     HSP_data : pandas.DataFrame
         Solubility data.
     scores : bool or str, default=True
-        Whether to return scores data. If True then scores are assumed to be
-        in the column name 'score'. Alternatively the column name can be
-        provided as a string; string matching is not case-sensitive.
+        Return scores as a separate Series. If `True` then scores are assumed to be
+        in the column name 'score'. An alternative column name may be passed as a string.
     drop_na : bool, default=True
         Whether to drop rows which do not have a score. This parameter is ignored when `scores=False`.
     da : bool, default=False
         Use split hydrogen bonding term. Expects and returns dH_donor and dH_acceptor columns.
-    inc_mvol : bool, default=False
-        Whether to include the molar volume (mvol) column.
-    inc_conc : bool or str, default=False
-        Whether to include the concentration column. If `True` the column is assumed
-        to be labelled 'conc'. Alternatively the column name can be provided as a
-        string; string matching is not case-sensitive. The returned column in the return dataframe will always be labelled 'conc'.
+    mvol : bool or str, default=False
+        Include the molar volume column. If `True` the column is assumed to be labelled 'mvol'.
+        An alternative column name may be passed as a string.
+    conc : bool or str, default=False
+        Include the concentration column. If `True` the column is assumed to be labelled 'conc'.
+        An alternative column name may be passed as a string.
     convert_to_molar : bool, default=False
-        Convert the concentration (assumed to be given in mg/ml)
-        to a molar concentration.
+        Convert the concentration (assumed to be given in mg/ml) to a molar concentration.
     Mw : float, default=None
         The solute molecular weight. Required when `convert_to_molar` is `True`.
     scores_transformer : callable, default=None
@@ -216,7 +244,10 @@ def prepare_dataframe(
 
     Returns
     -------
-    X: pandas.DataFrame, y: pandas.Series (optional)
+    X: pandas.DataFrame
+        Dataframe with the specified columns for use with an HSP estimator.
+    y: pandas.Series (optional)
+        Solubility scores.
 
     """
     df = HSP_data.copy()
@@ -224,18 +255,20 @@ def prepare_dataframe(
     required_cols = _get_labels(da)
     if scores:
         if isinstance(scores, str):
-            df["Score"] = df[scores.lower()]
-        required_cols += ["Score"]
-    if inc_mvol:
-        required_cols += ["MVol"]
-    if inc_conc:
-        if isinstance(inc_conc, str):
-            df["Conc"] = df[inc_conc]
-        required_cols += ["Conc"]
+            df["score"] = df[scores.lower()]
+        required_cols.append("Score")
+    if mvol:
+        if isinstance(mvol, str):
+            df["mvol"] = df[mvol.lower()]
+        required_cols.append("MVol")
+    if conc:
+        if isinstance(conc, str):
+            df["conc"] = df[conc.lower()]
+        required_cols.append("Conc")
     required_cols_lowercase = [s.lower() for s in required_cols]
     df = df.loc[:, required_cols_lowercase]
     df.columns = required_cols
-    if inc_conc and convert_to_molar:
+    if conc and convert_to_molar:
         if not Mw:
             raise ValueError(
                 "Cannot convert to molar concentration without molecular weight. Provide parameter `Mw`."

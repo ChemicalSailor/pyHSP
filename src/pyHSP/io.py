@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-from typing import Optional
+from pathlib import Path
+from typing import Optional, overload
 
 import pandas as pd
 
@@ -37,7 +38,16 @@ def read_hsdx(
 
     tree = ET.parse(file)
     chemicals = tree.iter("Chemical")
-    # idx = [ solv.text for solv in tree.iter( 'Solvent' ) if solv.text ]
+
+    # filter out entries that don't have a value for dD, i.e. the result entry
+    def check_dD_value(e):
+        dD = e.find("δD")
+        if dD is None:
+            return False
+        return bool(dD.text)
+
+    chemicals = filter(check_dD_value, chemicals)
+
     cols = {
         "Name": "Solvent",
         "dD": "δD",
@@ -57,9 +67,7 @@ def read_hsdx(
                 data[key] = el.text
         return data
 
-    data = [
-        to_dict(chemical) for chemical in chemicals if chemical.find("Solvent").text
-    ]
+    data = list(map(to_dict, chemicals))
     df = pd.DataFrame(data)
 
     # parse null values
@@ -114,46 +122,52 @@ def read_hsdx_result(file: TPathLike, extended: bool = False) -> pd.Series:
 
     tree = ET.parse(file)
     result = list(tree.iter("Results"))[-1].text
+    if not result:
+        raise ValueError("This file does not seem to have any fit results.")
+    # result = result or ""
 
-    try:
+    def parse_result(pattern: str, err_value: float | None = None) -> float:
         # this regex is using positive lookbehind assertion
         # the first part in brackets matches the preceeding part
         # the second part is the pattern to return, a number optionally preceeded by a space
-        dD = float(re.search("(?<=D=) ?[0-9.]*", result)[0])
-        dP = float(re.search("(?<=P=) ?[0-9.]*", result)[0])
-        dH = float(re.search("(?<=H=) ?[0-9.]*", result)[0])
-        R = float(re.search("(?<=R=) ?[0-9.]*", result)[0])
+        _pattern = f"(?<={pattern}=) ?[0-9.]*"
+        r = re.search(_pattern, result)
+        if r:
+            return float(r[0])
+        if err_value is None:
+            raise ValueError(f"Error matching pattern '{pattern}='")
+        return float(err_value)
 
-        dH_donor = re.search("(?<=HDon=) ?[0-9.]*", result)
-        if dH_donor:
-            dH_donor = float(dH_donor[0])
-            dH_acceptor = float(re.search("(?<=HAcc=) ?[0-9.]*", result)[0])
+    dD, dP, dH, R = [parse_result(s) for s in ("D", "P", "H", "R")]
 
-            labels = _get_labels(da=True) + ["radius"]
-            s = pd.Series([dD, dP, dH_donor, dH_acceptor, R], index=labels)
-        else:
-            labels = _get_labels(da=False) + ["radius"]
-            s = pd.Series([dD, dP, dH, R], index=labels)
+    try:
+        dH_donor, dH_acceptor = [parse_result(s) for s in ("HDon", "HAcc")]
+        da = True
+    except ValueError:
+        da = False
 
-    except TypeError as e:
-        if "NoneType" in e.args[0]:
-            raise ValueError("This file does not seem to have a fit result.")
-        else:  # pragma: no cover
-            raise e
+    labels = _get_labels(da, True)
+    if da:
+        s = pd.Series([dD, dP, dH_donor, dH_acceptor, R], index=labels)
+    else:
+        s = pd.Series([dD, dP, dH, R], index=labels)
 
     if extended:
-        s["In"] = int(re.search("(?<=In=) ?[0-9]*", result)[0])
-        s["Out"] = float(re.search("(?<=Out=) ?[0-9.]*", result)[0])
-        wi = re.search("(?<=Wrong In=) ?[0-9]*", result)
-        s["Wrong In"] = int(wi[0]) if wi else 0
-        wo = re.search("(?<=Wrong Out=) ?[0-9.]*", result)
-        s["Wrong Out"] = int(wo[0]) if wo else 0
-        s["Fit"] = float(re.search("(?<=Fit=) ?[0-9.]*", result)[0])
+        for pat in ("In", "Out", "Wrong In", "Wrong Out", "Fit"):
+            s[pat] = parse_result(pat, 0)
 
     return s
 
 
-def to_json(data: SeriesOrDataFrame, path: TPathLike = None) -> Optional[str]:
+@overload
+def to_json(data: SeriesOrDataFrame, path: None = None) -> str: ...
+
+
+@overload
+def to_json(data: SeriesOrDataFrame, path: TPathLike = ...) -> None: ...
+
+
+def to_json(data: SeriesOrDataFrame, path: TPathLike | None = None):
     """
     Save data in JSON format.
 
@@ -193,7 +207,7 @@ def read_json(path: TPathLike) -> pd.DataFrame:
     return pd.read_json(path, orient="index")
 
 
-def hsdx_to_json(file: TPathLike, out: TPathLike = None) -> None:
+def hsdx_to_json(file: TPathLike, out: TPathLike | None = None) -> None:
     """
     Convert an HSDX file to JSON format.
 
@@ -212,6 +226,7 @@ def hsdx_to_json(file: TPathLike, out: TPathLike = None) -> None:
     -------
     None
     """
+    file = Path(file)
     df = read_hsdx(file)
 
     if out:
@@ -222,7 +237,7 @@ def hsdx_to_json(file: TPathLike, out: TPathLike = None) -> None:
     return
 
 
-def hsdx_to_csv(file: TPathLike, out: TPathLike = None, **kws) -> None:
+def hsdx_to_csv(file: TPathLike, out: TPathLike | None = None, **kws) -> None:
     """
     Convert an HSDX file to CSV format.
 
@@ -240,6 +255,7 @@ def hsdx_to_csv(file: TPathLike, out: TPathLike = None, **kws) -> None:
     -------
     None
     """
+    file = Path(file)
     df = read_hsdx(file)
 
     if out:
