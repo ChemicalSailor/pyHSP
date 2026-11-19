@@ -302,7 +302,7 @@ def calculate_distance(
     return dist
 
 
-def RED(solute_HSP: ArrayLike, solvent_HSP: ArrayLike) -> Numeric:
+def RED(solute_HSP: ArrayLike, solvent_HSP: ArrayLike) -> NDArray[np.floating]:
     """
     Calculate the Relative Energy Difference.
 
@@ -334,7 +334,7 @@ def RED(solute_HSP: ArrayLike, solvent_HSP: ArrayLike) -> Numeric:
     solvent_HSP = np.atleast_2d(solvent_HSP)
     radius = solute_HSP[:, 3]
     dist = calculate_distance(solute_HSP[:, :3], solvent_HSP)
-    red = (dist / radius).squeeze()
+    red = dist / radius
     return red
 
 

@@ -12,7 +12,7 @@ import pandas as pd
 # import os
 # import argparse
 
-from typing import Tuple, Callable
+from typing import Callable, Concatenate, overload
 from numpy.typing import ArrayLike, NDArray
 from sklearn.utils import check_array as _skl_check_array, check_consistent_length
 from functools import wraps
@@ -108,11 +108,15 @@ def check_beta(beta: int | float) -> float:
 # return wrapper
 
 
-def _as_series(func: Callable) -> Callable:
+def keep_index[_Self, **P](
+    func: Callable[Concatenate[_Self, ArrayLike, P], NDArray],
+) -> Callable[Concatenate[_Self, ArrayLike, P], pd.Series | NDArray]:
     """Decorator to output a series if input is a dataframe."""
 
     @wraps(func)
-    def wrapper(self, X, *args, **kwargs) -> pd.Series | ArrayLike:
+    def wrapper(
+        self: _Self, X: ArrayLike, *args: P.args, **kwargs: P.kwargs
+    ) -> pd.Series | NDArray:
         result = func(self, np.asarray(X), *args, **kwargs)
         if isinstance(X, pd.DataFrame):
             return pd.Series(result, index=X.index)

@@ -6,10 +6,8 @@ Created on Fri Sep  4 16:13:44 2020
 """
 
 from __future__ import annotations
-from textwrap import dedent
 import numpy as np
 import pandas as pd
-import os.path
 import json
 from warnings import warn
 from typing import (
@@ -25,7 +23,6 @@ from typing import (
     overload,
 )
 from abc import abstractmethod, ABC
-from pandas.core.accessor import CachedAccessor
 from sklearn.base import BaseEstimator, clone, ClassifierMixin
 from sklearn.utils import (
     check_X_y,
@@ -71,7 +68,7 @@ from .functional import (
     solvent_molarity,
 )
 from .io import read_hsdx_result
-from ._utils import check_X, check_X_y, _as_series, check_beta
+from ._utils import check_X, check_X_y, keep_index, check_beta
 from ._conf import BETA_MAX
 from numpy.typing import ArrayLike, NDArray
 
@@ -426,8 +423,8 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
     #         return False
     #     return d_self == d_other
 
-    @_as_series
-    def distance(self, X: ArrayLike) -> np.ndarray | pd.Series:
+    @keep_index
+    def distance(self, X: ArrayLike) -> NDArray[np.floating]:
         """
         Calculate distances from the fitted sphere center to solvents.
 
@@ -449,8 +446,8 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
         coef = np.asarray(self.coef_)[: self._n_hsp]
         return calculate_distance(coef, X, da=self.da)
 
-    @_as_series
-    def decision_function(self, X: ArrayLike) -> np.ndarray | pd.Series:
+    @keep_index
+    def decision_function(self, X: ArrayLike) -> NDArray[np.floating]:
         """
         Calculate the signed distance of solvents from the sphere boundary.
 
@@ -477,8 +474,14 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
         kws.update(self.fit_params_)
         return _decision_function(coef, X, **kws)
 
-    @_as_series
-    def predict_proba(self, X: ArrayLike):
+    # predict_proba is defined privately without keep_index decorator to explictly return an ndarray for typing purposes
+    def _predict_proba(self, X: ArrayLike) -> NDArray[np.floating]:
+        check_is_fitted(self, "beta_")
+        X = check_X(X, n_features=self._n_hsp, estimator=self)
+        return expit(self.beta_ * self.decision_function(X))
+
+    @keep_index
+    def predict_proba(self, X: ArrayLike) -> NDArray[np.floating]:
         """
         Estimate the probability that each solvent dissolves the solute.
 
@@ -494,12 +497,10 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
             Predicted probabilities for dissolution. If ``X`` is a DataFrame,
             the returned Series retains its index.
         """
-        check_is_fitted(self, "beta_")
-        X = check_X(X, n_features=self._n_hsp, estimator=self)
-        return expit(self.beta_ * self.decision_function(X))
+        return self._predict_proba(X)
 
-    @_as_series
-    def predict(self, X: ArrayLike):
+    @keep_index
+    def predict(self, X: ArrayLike) -> NDArray[np.uint8]:
         """
         Predict whether each solvent dissolves the solute.
 
@@ -516,9 +517,9 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
             the returned Series retains its index.
         """
         X = check_X(X, n_features=self._n_hsp, estimator=self)
-        return self.predict_proba(np.array(X)).round().astype(np.uint8)
+        return self._predict_proba(X).round().astype(np.uint8)
 
-    def fit(self, X: ArrayLike, y: ArrayLike):
+    def fit(self, X: ArrayLike, y: ArrayLike) -> Self:
         """
         Abstract method to be implemented for fitting.
         """
@@ -526,7 +527,7 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
             "BaseSphere is an abstract class and cannot be fitted."
         )
 
-    def fit_predict(self, X: ArrayLike, y: ArrayLike):
+    def fit_predict(self, X: ArrayLike, y: ArrayLike) -> NDArray[np.uint8] | pd.Series:
         """
         Fit the estimator and predict the supplied samples.
 
@@ -554,7 +555,7 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
         *,
         sample_weight: ArrayLike | None = None,
         scoring: Callable | str = "f1",
-    ):
+    ) -> float:
         """
         Evaluate the fitted sphere with a scikit-learn scorer.
 
@@ -613,6 +614,24 @@ class _HSPDataFrameAccessor:
         self._sphere = sphere
         self._inc_mvol = inc_mvol
         self._inc_conc = inc_conc
+
+    @overload
+    def __call__(
+        self,
+        HSP: pd.DataFrame,
+        return_scores: Literal[True] = ...,
+        score_col: str = "Score",
+        drop_na: bool = True,
+    ) -> tuple[pd.DataFrame, pd.Series]: ...
+
+    @overload
+    def __call__(
+        self,
+        HSP: pd.DataFrame,
+        return_scores: Literal[False] = ...,
+        score_col: str = "Score",
+        drop_na: bool = True,
+    ) -> pd.DataFrame: ...
 
     def __call__(
         self,
@@ -692,7 +711,7 @@ class _HSPDataFrameAccessor:
             Binary dissolution predictions, indexed like the input.
         """
         X, y = self(HSP, return_scores=True, score_col=score_col, drop_na=True)
-        return self._sphere.fit_predict(X, y)
+        return self._sphere.fit_predict(X, y)  # pyright: ignore[reportReturnType]
 
     def predict(self, HSP: pd.DataFrame) -> pd.Series:
         """
@@ -709,7 +728,7 @@ class _HSPDataFrameAccessor:
             Binary dissolution predictions, indexed like the input.
         """
         X = self(HSP, return_scores=False, drop_na=False)
-        return self._sphere.predict(X)
+        return self._sphere.predict(X)  # pyright: ignore[reportReturnType]
 
     def predict_proba(self, HSP: pd.DataFrame) -> pd.Series:
         """
@@ -726,7 +745,7 @@ class _HSPDataFrameAccessor:
             Predicted probabilities, indexed like the input.
         """
         X = self(HSP, return_scores=False, drop_na=False)
-        return self._sphere.predict_proba(X)
+        return self._sphere.predict_proba(X)  # pyright: ignore[reportReturnType]
 
     def decision_function(self, HSP: pd.DataFrame) -> pd.Series:
         """
@@ -743,7 +762,7 @@ class _HSPDataFrameAccessor:
             Signed distance metric, indexed like the input.
         """
         X = self(HSP, return_scores=False, drop_na=False)
-        return self._sphere.decision_function(X)
+        return self._sphere.decision_function(X)  # pyright: ignore[reportReturnType]
 
     def distance(self, HSP: pd.DataFrame) -> pd.Series:
         """
@@ -760,11 +779,11 @@ class _HSPDataFrameAccessor:
             Distances in Hansen solubility space, indexed like the input.
         """
         X = self(HSP, return_scores=False, drop_na=False)
-        return self._sphere.distance(X)
+        return self._sphere.distance(X)  # pyright: ignore[reportReturnType]
 
     def score(
         self, HSP: pd.DataFrame, *, scoring: str = "f1", score_col: str = "Score"
-    ) -> pd.Series:
+    ) -> float:
         """
         Evaluate the estimator on scores from an HSP DataFrame.
 
@@ -1196,8 +1215,8 @@ class ClassicSphere(HSPEstimator):
 
         return self
 
-    @_as_series
-    def RED(self, X: ArrayLike):
+    @keep_index
+    def RED(self, X: ArrayLike) -> NDArray[np.floating]:
         """
         Calculate the Relative Energy Difference (RED) for each solvent.
 
