@@ -3,9 +3,12 @@
 import numpy as np
 import pytest
 
-from pyHSP._utils import check_X, check_y, check_X_y
+from pyHSP._conf import BETA_MAX
+from pyHSP._utils import check_X, check_y, check_X_y, check_beta
 
-# tests for check_X
+# ---------------------------------------------------------------------------
+# check_X
+# ---------------------------------------------------------------------------
 
 
 def test_check_X():
@@ -19,11 +22,18 @@ def test_check_X_invalid_features():
         check_X(X, n_features=3, min_samples=4)
 
 
-# tests for check_y
+# ---------------------------------------------------------------------------
+# check_y
+# ---------------------------------------------------------------------------
 
 
 def test_check_y():
     np.testing.assert_equal(check_y([0, 1], graded=False), np.array([0, 1]))
+
+
+def test_check_y_1d():
+    with pytest.raises(ValueError, match="1-dimensional"):
+        check_y([[0], [1]])
 
 
 @pytest.mark.parametrize("y", ([1, 2], [0, 0.5]))
@@ -43,7 +53,9 @@ def test_check_y_graded_invalid(y):
         check_y(np.array(y), graded=True)
 
 
-# tests for check_X_y
+# ---------------------------------------------------------------------------
+# check_X_y
+# ---------------------------------------------------------------------------
 
 
 def test_check_X_y():
@@ -60,3 +72,19 @@ def test_check_X_y_inconsistent_length():
     y = [0, 0.5, 0.6]
     with pytest.raises(ValueError, match="minimum of 4"):
         check_X_y(X, y, n_features=3, min_samples=4, graded=True)
+
+
+# ---------------------------------------------------------------------------
+# check_beta
+# ---------------------------------------------------------------------------
+
+
+def test_beta_type():
+    with pytest.raises(TypeError, match="float"):
+        check_beta("fit")  # type: ignore
+
+
+@pytest.mark.parametrize("val", (-1, BETA_MAX + 1))
+def test_beta_value(val):
+    with pytest.raises(ValueError, match="greater than 0"):
+        check_beta(val)

@@ -2,7 +2,9 @@
 
 from pathlib import Path
 from typing import Optional, overload
-
+import xml.etree.ElementTree as ET
+import re
+from functools import partial
 import pandas as pd
 
 from .types import TPathLike, SeriesOrDataFrame
@@ -34,8 +36,6 @@ def read_hsdx(
     not be used on untrusted files.
 
     """
-    import xml.etree.ElementTree as ET
-
     tree = ET.parse(file)
     chemicals = tree.iter("Chemical")
 
@@ -98,6 +98,21 @@ def read_hsdx(
     return df
 
 
+def _parse_fit_result_param(
+    result: str, pattern: str, err_value: float | None = None
+) -> float:
+    # this regex is using positive lookbehind assertion
+    # the first part in brackets matches the preceeding part
+    # the second part is the pattern to return, a number optionally preceeded by a space
+    _pattern = f"(?<={pattern}=) ?[0-9.]*"
+    r = re.search(_pattern, result)
+    if r:
+        return float(r[0])
+    if err_value is None:
+        raise ValueError(f"Error matching pattern '{pattern}='")
+    return float(err_value)
+
+
 def read_hsdx_result(file: TPathLike, extended: bool = False) -> pd.Series:
     """
     Read a fit result saved in HSDX format.
@@ -117,26 +132,14 @@ def read_hsdx_result(file: TPathLike, extended: bool = False) -> pd.Series:
         dH parameter. Fit quality metrics are included as addtional entries if `extended=True`.
 
     """
-    import xml.etree.ElementTree as ET
-    import re
 
     tree = ET.parse(file)
     result = list(tree.iter("Results"))[-1].text
-    if not result:
+    if not result or result == "-":
         raise ValueError("This file does not seem to have any fit results.")
     # result = result or ""
 
-    def parse_result(pattern: str, err_value: float | None = None) -> float:
-        # this regex is using positive lookbehind assertion
-        # the first part in brackets matches the preceeding part
-        # the second part is the pattern to return, a number optionally preceeded by a space
-        _pattern = f"(?<={pattern}=) ?[0-9.]*"
-        r = re.search(_pattern, result)
-        if r:
-            return float(r[0])
-        if err_value is None:
-            raise ValueError(f"Error matching pattern '{pattern}='")
-        return float(err_value)
+    parse_result = partial(_parse_fit_result_param, result)
 
     dD, dP, dH, R = [parse_result(s) for s in ("D", "P", "H", "R")]
 

@@ -64,7 +64,7 @@ class TestValidateDataFrame:
     @pytest.mark.parametrize("check", [True, False])
     @staticmethod
     def test_numeric_index(df, check):
-        df.reset_index(inplace=True)
+        df = df.reset_index()
         if check:
             with pytest.raises(TypeError, match="string dtype"):
                 validate_HSP_dataframe(df, check_index=True)
@@ -191,6 +191,22 @@ class TestPrepareDataframe:
         else:
             X, y = prepare_dataframe(self.df, scores=True, drop_na=True)
             assert all(y == [0.8, 0.3])
+
+    @pytest.mark.parametrize("conc", (True, "mvol"))
+    def test_conc_param(self, conc):
+        X = prepare_dataframe(self.df, scores=False, conc=conc)
+        if conc == "mvol":
+            assert all(X["Conc"] == [102.0, 124.0, 98.0])
+        else:
+            assert all(X["Conc"] == [10.0, 15.0, 10.0])
+
+    @pytest.mark.parametrize("conc", (True, "conc"))
+    def test_mvol_param(self, mvol):
+        X = prepare_dataframe(self.df, scores=False, mvol=mvol)
+        if mvol == "conc":
+            assert all(X["MVol"] == [10.0, 15.0, 10.0])
+        else:
+            assert all(X["MVol"] == [102.0, 124.0, 98.0])
 
     def test_no_Mw_error(self):
         with pytest.raises(ValueError, match="Cannot convert"):

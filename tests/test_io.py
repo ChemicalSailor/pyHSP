@@ -6,6 +6,7 @@ import pytest
 import json
 
 from pyHSP.io import (
+    _parse_fit_result_param,
     read_hsdx,
     read_hsdx_result,
     to_json,
@@ -18,13 +19,6 @@ from pyHSP.io import (
 # ---------------------------------------------------------------------------
 
 
-# @pytest.mark.parametrize(
-#     "filename",
-#     [
-#         "HSDX.hsdx",
-#         "HSDX_DA.hsdx",
-#     ],
-# )
 def test_read_hsdx(data_dir):
     result = read_hsdx(data_dir / "HSDX.hsdx")
 
@@ -85,8 +79,23 @@ def test_read_hsdx_result(filename, expected, data_dir, extended):
 
 
 def test_read_hsdx_no_result(data_dir):
-    with pytest.raises(ValueError, match="Error matching pattern"):
+    with pytest.raises(ValueError, match="fit results"):
         read_hsdx_result(data_dir / "no_result.hsdx")
+
+
+def test__parse_fit_result_param():
+    retval = _parse_fit_result_param("In= 10", "In")
+    assert isinstance(retval, float)
+    assert retval == 10.0
+
+
+def test__parse_fit_result_default():
+    assert _parse_fit_result_param("No value", "In", 0) == 0.0
+
+
+def test_parse_fit_result_raises():
+    with pytest.raises(ValueError, match="Error match"):
+        _parse_fit_result_param("No value", "In")
 
 
 # ---------------------------------------------------------------------------

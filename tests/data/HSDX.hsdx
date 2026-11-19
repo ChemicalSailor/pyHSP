@@ -28,6 +28,20 @@
     <SMILES>CC(OC(C)=O)=O</SMILES>
     <Results>-</Results>
   </Chemical>
+    <Chemical>
+    <No.>3</No.>
+    <Solvent>Solvent Corrupted</Solvent>
+    <δD></δD>
+    <δP>7.7</δP>
+    <δH>1.2</δH>
+    <δHD_x002F_A>0.0/10.2</δHD_x002F_A>
+    <Score>1</Score>
+    <RED>0.654</RED>
+    <MVol>95</MVol>
+    <CAS></CAS>
+    <SMILES></SMILES>
+    <Results>-</Results>
+  </Chemical>
   <Chemical>
     <No. />
     <Solvent />

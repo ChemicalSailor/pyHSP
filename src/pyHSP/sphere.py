@@ -519,7 +519,7 @@ class HSPEstimator(BaseEstimator, ClassifierMixin):
         """
         Abstract method to be implemented for fitting.
         """
-        raise NotImplementedError(
+        raise NotImplementedError(  # pragma: no-cover
             "BaseSphere is an abstract class and cannot be fitted."
         )
 
