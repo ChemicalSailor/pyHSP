@@ -1,27 +1,21 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Sep 18 16:03:10 2026
 
-@author: tfletcher
-"""
 
 import numpy as np
 import pandas as pd
-# import matplotlib.pyplot as plt
-# import os
-# import argparse
+
 from scipy.optimize import minimize
 
-from .pyHSP import calculate_distance, validate_HSP_dataframe
-from .pandas import _get_labels
+from .functional import calculate_distance
+from .pandas import _get_labels, validate_HSP_dataframe
 
 
 def calculate_blend_HSP(
-        mixture_table: pd.DataFrame,
-        da: bool = False,
-        check_vol: bool = True,
-        volume_col = 'vol'
-        ) -> pd.Series:
+    mixture_table: pd.DataFrame,
+    da: bool = False,
+    check_vol: bool = True,
+    volume_col="vol",
+) -> pd.Series:
     """
     Calculate HSP of a mixture.
 
@@ -44,16 +38,18 @@ def calculate_blend_HSP(
         The blend HSP.
 
     """
-    mixture_table = validate_HSP_dataframe(mixture_table, da=da, check_mvol=False, check_index=False)
-    labels = _get_labels( da ) + [volume_col]
+    mixture_table = validate_HSP_dataframe(
+        mixture_table, da=da, check_mvol=False, check_index=False
+    )
+    labels = _get_labels(da) + [volume_col]
     HSP = mixture_table[labels]
-    ratios = mixture_table.loc[:,volume_col].to_numpy().reshape(-1, 1)
-    if check_vol and not np.isclose( ratios.sum(), 1 ):
-        raise ValueError( 'The given component ratios do not sum to unity.' )
-    return (HSP * ratios).sum(axis='rows')
+    ratios = mixture_table.loc[:, volume_col].to_numpy().reshape(-1, 1)
+    if check_vol and not np.isclose(ratios.sum(), 1):
+        raise ValueError("The given component ratios do not sum to unity.")
+    return (HSP * ratios).sum(axis="rows")
 
 
-def create_grid( pairs:list ):
+def create_grid(pairs: list):
     """
     Create a grid of binary solvent blends from given pairs.
 
@@ -83,11 +79,13 @@ def create_grid( pairs:list ):
     """
     table = []
     for spec in pairs:
-        if len( spec ) < 2:
-            raise ValueError( 'Expected tuple with length of at least 2, got length %d.' % len(spec) )
+        if len(spec) < 2:
+            raise ValueError(
+                "Expected tuple with length of at least 2, got length %d." % len(spec)
+            )
         if len(spec) == 2:
             solv1, solv2 = spec
-            n, bounds = 5, (100,0)
+            n, bounds = 5, (100, 0)
         elif len(spec) == 3:
             solv1, solv2, n = spec
             if type(n) is tuple:
@@ -97,37 +95,41 @@ def create_grid( pairs:list ):
                 bounds = (100, 0)
         else:
             solv1, solv2, n, bounds = spec
-        if sum( bounds ) != 100:
-            raise ValueError( 'The bounds must sum to 100. Received {}'.format( str(bounds) ) )
-        mixture_master = pd.DataFrame( [solv1, solv2] )
-        blends = np.linspace( *bounds, n )
+        if sum(bounds) != 100:
+            raise ValueError(
+                "The bounds must sum to 100. Received {}".format(str(bounds))
+            )
+        mixture_master = pd.DataFrame([solv1, solv2])
+        blends = np.linspace(*bounds, n)
         for solv1_ratio in blends:
             mix = mixture_master.copy()
-            mix['vol%'] = [ solv1_ratio, 100 - solv1_ratio ]
-            mix_hsp = calculate_blend_HSP( mix )
-            mix_hsp.name = '{solv1}:{solv2} {r1}:{r2}'.format( solv1=solv1.name, solv2=solv2.name, r1=solv1_ratio, r2=100-solv1_ratio )
-            mix_hsp['solv1'] = solv1.name
-            mix_hsp['solv2'] = solv2.name
-            mix_hsp['solv1_%'] = solv1_ratio
-            mix_hsp['solv2_%'] = 100 - solv1_ratio
-            table.append( mix_hsp )
-    table = pd.DataFrame( table )
-    return table.drop_duplicates( table.columns[:4] )
+            mix["vol%"] = [solv1_ratio, 100 - solv1_ratio]
+            mix_hsp = calculate_blend_HSP(mix)
+            mix_hsp.name = "{solv1}:{solv2} {r1}:{r2}".format(
+                solv1=solv1.name, solv2=solv2.name, r1=solv1_ratio, r2=100 - solv1_ratio
+            )
+            mix_hsp["solv1"] = solv1.name
+            mix_hsp["solv2"] = solv2.name
+            mix_hsp["solv1_%"] = solv1_ratio
+            mix_hsp["solv2_%"] = 100 - solv1_ratio
+            table.append(mix_hsp)
+    table = pd.DataFrame(table)
+    return table.drop_duplicates(table.columns[:4])
 
 
 def optimize_blend(
-        solvents,
-        target,
-        *,
-        mode='optimize',
-        da=False,
-        # reg=None,
-        bounds=None,
-        target_n=None,
-        alpha=0.05,
-        tol=1e-5,
-        # eps=1e-12
-        ):
+    solvents,
+    target,
+    *,
+    mode="optimize",
+    da=False,
+    # reg=None,
+    bounds=None,
+    target_n=None,
+    alpha=0.05,
+    tol=1e-5,
+    # eps=1e-12
+):
     """
     Create a solvent blend matching target HSP.
 
@@ -178,21 +180,23 @@ def optimize_blend(
     mixture_table = solvents.copy()
 
     # function to minimise
-    def blend_distance( weights:np.ndarray ) -> float:
-        mixture_table['vol'] = weights
-        blend_HSP = calculate_blend_HSP( mixture_table, da=da, check_vol=False )
-        if mode == 'optimize':
+    def blend_distance(weights: np.ndarray) -> float:
+        mixture_table["vol"] = weights
+        blend_HSP = calculate_blend_HSP(mixture_table, da=da, check_vol=False)
+        if mode == "optimize":
             # Use the actual distance equation including the relative importance
             # of dD parameter and donor-acceptor interactions
             _da = da
             _classic = True
-        elif mode == 'match':
+        elif mode == "match":
             # Modifying distance arguments to return a simple squared error
             _da = False
             _classic = False
         else:
-            raise ValueError( f'Unknown value `{mode}` given for `mode` argument.' )
-        dist = calculate_distance( blend_HSP[:-1], target, root=False, classic=_classic, da=_da )
+            raise ValueError(f"Unknown value `{mode}` given for `mode` argument.")
+        dist = calculate_distance(
+            blend_HSP[:-1], target, root=False, classic=_classic, da=_da
+        )
         # if reg=='l1':
         #     # sum of weights will always be 1, so use inverse sum where small
         #     # weights add the most to regularisation term
@@ -206,32 +210,38 @@ def optimize_blend(
             # maths trick to approx count how many solvents are in use whilst
             # keeping function continuous; if weight is >> threshold then
             # value ~1 and if weight << threshold then value ~0
-            n_solv = np.sum( weights / ( weights + tol ) )
-            reg_term += ( target_n - n_solv )**2 / mixture_table.shape[0]**2
+            n_solv = np.sum(weights / (weights + tol))
+            reg_term += (target_n - n_solv) ** 2 / mixture_table.shape[0] ** 2
         # if reg=='l2':
         #     reg_term += (weights**2).sum()
         return dist + alpha * reg_term
 
     n_solvents = solvents.shape[0]
-    weights_init = np.random.random( n_solvents )
+    weights_init = np.random.random(n_solvents)
     weights_init /= weights_init.sum()
 
     if bounds is None:
-        bounds = ( (0, 1), ) * n_solvents
+        bounds = ((0, 1),) * n_solvents
 
     constraints = [
-        { # components must sum to 100%
-        'type': 'eq',
-        'fun': lambda weights: 1 - np.sum( weights ),
+        {  # components must sum to 100%
+            "type": "eq",
+            "fun": lambda weights: 1 - np.sum(weights),
         },
     ]
-    opt_res = minimize( blend_distance, weights_init, method='SLSQP', bounds=bounds, constraints=constraints )
+    opt_res = minimize(
+        blend_distance,
+        weights_init,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+    )
     if not opt_res.success:
-        raise RuntimeError( "Error during optimisation", opt_res, solvents, target )
+        raise RuntimeError("Error during optimisation", opt_res, solvents, target)
 
-    mixture_table['vol'] = opt_res.x
-    blend_HSP = calculate_blend_HSP( mixture_table, da=da )
-    ratios = pd.Series( opt_res.x, index=solvents.index, name='vol' )
+    mixture_table["vol"] = opt_res.x
+    blend_HSP = calculate_blend_HSP(mixture_table, da=da)
+    ratios = pd.Series(opt_res.x, index=solvents.index, name="vol")
     return ratios, blend_HSP
 
 
