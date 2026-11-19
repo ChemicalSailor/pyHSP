@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Sep  4 16:13:44 2020
 
-@author: tfletcher
-"""
 
 from __future__ import annotations
 import numpy as np
