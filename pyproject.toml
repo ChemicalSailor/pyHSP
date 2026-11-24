@@ -7,7 +7,7 @@ name = "pyhsp"
 dynamic = ["version"]
 description = 'Hansen Solubility Parameter (HSP) fitting.'
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "MIT"
 keywords = ["Hansen Solubility", "Chemistry", "Science", "scikit-learn"]
 authors = [
@@ -16,15 +16,17 @@ authors = [
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.12",  
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "numpy>=2",
+  "numpy>=2.3",
   "pandas>=3",
   "scikit-learn>=1.8",
+  "scipy>=1.18",
 ]
 
 # [project.urls]
@@ -40,18 +42,21 @@ dependencies = [
   "pytest",
   "pytest-cov",
   "pytest-check",
+  "pytest-mock",
   "jupyterlab",
   "matplotlib",
   "seaborn",
   "hspipy",
+  "pydoclint",
 ]
 
-[tool.hatch.envs.types]
-extra-dependencies = [
-  "mypy>=1.0.0",
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest",
 ]
-[tool.hatch.envs.types.scripts]
-check = "mypy --install-types --non-interactive {args:src/pyhsp tests}"
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.12", "3.13", "3.14", "3.15"]
 
 [tool.coverage.run]
 source_pkgs = ["pyhsp", "tests"]
