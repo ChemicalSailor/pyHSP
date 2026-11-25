@@ -591,6 +591,7 @@ class _HSPDataFrameAccessor:
         *,
         inc_mvol: bool | str = False,
         inc_conc: bool | str = False,
+        scores_transformer: Callable | None = None,
     ):
         """
         Initialize the DataFrame adapter for an HSP estimator.
@@ -605,11 +606,14 @@ class _HSPDataFrameAccessor:
         inc_conc : bool or str, default=False
             Whether to include the concentration feature. A string specifies
             the concentration column name.
+        scores_transformer : Callable or None, default=None
+            Function to preprocess scores
         """
 
         self._sphere = sphere
         self._inc_mvol = inc_mvol
         self._inc_conc = inc_conc
+        self.scores_transformer = scores_transformer
 
     @overload
     def __call__(
@@ -657,7 +661,6 @@ class _HSPDataFrameAccessor:
             scores.
         """
         scores = score_col if return_scores else False
-        scores_trf = None if self._sphere.graded else np.round
         # Mw = self._sphere.Mw if self._inc_conc else None
         return prepare_dataframe(
             HSP,
@@ -668,7 +671,7 @@ class _HSPDataFrameAccessor:
             conc=self._inc_conc,
             # convert_to_molar=True,
             # Mw=Mw,
-            scores_transformer=scores_trf,
+            scores_transformer=self.scores_transformer,
         )
 
     def fit(self, HSP: pd.DataFrame, *, score_col: str = "Score") -> HSPEstimator:
@@ -933,7 +936,9 @@ class ClassicSphere(HSPEstimator):
         self.init_sigma = init_sigma
         self.random_state = random_state
 
-        self.pd = _HSPDataFrameAccessor(self, inc_mvol=False, inc_conc=False)
+        self.pd = _HSPDataFrameAccessor(
+            self, inc_mvol=False, inc_conc=False, scores_transformer=np.round
+        )
 
     @classmethod
     def from_hsdx(cls, path: TPathLike, *, beta_: float = BETA_MAX) -> Self:
