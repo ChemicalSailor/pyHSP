@@ -50,13 +50,27 @@ dependencies = [
   "pydoclint",
 ]
 
-[tool.hatch.envs.test]
+[tool.hatch.envs.hatch-test]
+installer = "uv"
 dependencies = [
-  "pytest",
+  "pytest-cov>=7.1",
+  "pytest-check>=3.1",
+  "pytest-mock>=3.17",
 ]
 
-[[tool.hatch.envs.test.matrix]]
+[[tool.hatch.envs.hatch-test.matrix]]
 python = ["3.12", "3.13", "3.14", "3.15"]
+deps = ["latest"]
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.12"]
+deps = ["minimum"]
+
+[tool.hatch.envs.hatch-test.overrides]
+matrix.deps.env-vars = [
+  { key = "UV_RESOLUTION", value = "lowest-direct", if = ["minimum"] },
+]
+
 
 [tool.coverage.run]
 source_pkgs = ["pyhsp", "tests"]
