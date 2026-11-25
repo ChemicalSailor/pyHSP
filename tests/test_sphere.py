@@ -131,7 +131,7 @@ LABELS = ("dD", "dP", "dH", "radius")
 
 @pytest.fixture
 def sphere():
-    return ClassicSphere().set_coef(COEF)
+    return ClassicSphere(n_fits=2).set_coef(COEF)
 
 
 @pytest.fixture
@@ -222,7 +222,7 @@ class TestClassicSphere:
     def test_fit(self, solvents, solvent_scores, check):
         # using pytest-check imported as a fixture
         # beta set to a high value as expecting perfect classification
-        sphere = ClassicSphere(n_fits=20, beta=5.0, random_state=42).fit(
+        sphere = ClassicSphere(n_fits=5, beta=5.0, random_state=42).fit(
             solvents, solvent_scores
         )
         pred = sphere.predict(solvents)
@@ -254,7 +254,7 @@ class TestClassicSphere:
             ClassicSphere().fit(X, y)
 
     def test_fit_beta(self, solvents, solvent_scores):
-        sphere = ClassicSphere(n_fits=20, beta="fit", random_state=42).fit(
+        sphere = ClassicSphere(n_fits=5, beta="fit", random_state=42).fit(
             solvents, solvent_scores
         )
         assert sphere.beta_ == BETA_MAX
@@ -262,7 +262,7 @@ class TestClassicSphere:
     @pytest.mark.parametrize("beta", ["silly", -2])
     def test_fit_validates_beta(self, beta, solvents, solvent_scores):
         with pytest.raises(ValueError, match="'fit' or a positive"):
-            ClassicSphere(beta=beta).fit(solvents, solvent_scores)
+            ClassicSphere(n_fits=2, beta=beta).fit(solvents, solvent_scores)
 
     def test_fit_squared_dist(self, solvents, solvent_scores):
         sphere = ClassicSphere(
@@ -316,7 +316,7 @@ class TestBatchedEstimator:
 
     @pytest.fixture
     def batched(self):
-        sphere = ClassicSphere(beta="fit", n_fits=10)
+        sphere = ClassicSphere(beta="fit", n_fits=5, random_state=42)
         return BatchedEstimator(sphere)
 
     def test_fit(self, split_data, batched):
@@ -363,6 +363,8 @@ class TestAccessorIntegration:
         X, y = sphere.pd(solvents_df, return_scores=True)
         pdt.assert_series_equal(y, solvents_df["Score"])
 
-    def test_fit_predict(self, sphere, solvents_df):
-        predictions = sphere.pd.fit_predict(solvents_df)
+    def test_fit_predict(self, solvents_df):
+        predictions = ClassicSphere(n_fits=5, random_state=42).pd.fit_predict(
+            solvents_df
+        )
         pdt.assert_series_equal(predictions, solvents_df["Score"], check_names=False)

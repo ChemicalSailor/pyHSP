@@ -200,7 +200,7 @@ class TestPrepareDataframe:
         else:
             assert all(X["Conc"] == [10.0, 15.0, 10.0])
 
-    @pytest.mark.parametrize("conc", (True, "conc"))
+    @pytest.mark.parametrize("mvol", (True, "conc"))
     def test_mvol_param(self, mvol):
         X = prepare_dataframe(self.df, scores=False, mvol=mvol)
         if mvol == "conc":
