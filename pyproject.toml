@@ -29,10 +29,10 @@ dependencies = [
   "scipy>=1.18",
 ]
 
-# [project.urls]
-# Documentation = "https://github.com/Tom/pyhsp#readme"
-# Issues = "https://github.com/Tom/pyhsp/issues"
-# Source = "https://github.com/Tom/pyhsp"
+[project.urls]
+Documentation = "https://github.com/ChemicalSailor/pyHSP#readme"
+Issues = "https://github.com/ChemicalSailor/pyHSP/issues"
+Source = "https://github.com/ChemicalSailor/pyHSP"
 
 [tool.hatch.version]
 path = "src/pyhsp/__init__.py"

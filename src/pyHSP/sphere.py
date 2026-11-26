@@ -1380,3 +1380,6 @@ class BatchedEstimator:
                 for est, single_X, single_y in zip(self.fitted_estimators_, X, y_true)
             ]
         return scores
+
+
+__all__ = ["ClassicSphere", "BatchedEstimator"]

@@ -13,9 +13,9 @@ The fit and predict method of HSP aligns with machine learning, specifically cla
 
 ### Roadmap
 - [x] Sphere fitting using classic Hansen distance
-- [] Support for donor/acceptor split hydrogen bonding term
-- [] Support for Louwerse et al. improvements
-- [] Visualisation
+- [ ] Support for donor/acceptor split hydrogen bonding term
+- [ ] Support for Louwerse et al. improvements
+- [ ] Visualisation
 
 ### License
 This software is licensed under the MIT license.
